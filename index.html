@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOᗰᗩTO</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+    <div class="logo">🍅 T O ᗰ ᗩ T O </div>
+
+    <div class="controls">
+        <select id="sortSelect">
+            <option value="az">Sort A → Z</option>
+            <option value="za">Sort Z → A</option>
+        </select>
+
+        <select id="gridSelect">
+            <option value="auto"> Layout</option>
+            <option value="1">1 per row</option>
+            <option value="2">2 per row</option>
+            <option value="3">3 per row</option>
+            <option value="4">4 per row</option>
+        </select>
+
+        <button id="toggleMode" class="toggle-btn">🌙/☀️</button>
+        <button id="listViewBtn" class="toggle-btn"> MODELS </button>
+    </div>
+</header>
+
+<div class="search-container">
+    <input type="text" id="searchInput" placeholder=" Search by name…">
+</div>
+
+<div id="gallery" class="gallery"></div>
+
+<div id="pagination"></div>
+
+<button class="scroll-to-top" id="scrollTopBtn">▲</button>
+
+<script>
+const ITEMS_PER_PAGE = 100;
+let fullData = [], filteredData = [], currentPage = 1;
+
+// Auto layout based on screen width
+function autoGrid() {
+    if (window.innerWidth < 600) return "1";
+    if (window.innerWidth < 900) return "2";
+    return "3";
+}
+
+function applyGridSetting(value) {
+    const gallery = document.getElementById("gallery");
+    if (value === "auto") {
+        gallery.style.gridTemplateColumns = `repeat(${autoGrid()}, 1fr)`;
+    } else {
+        gallery.style.gridTemplateColumns = `repeat(${value}, 1fr)`;
+    }
+}
+
+document.getElementById("gridSelect").addEventListener("change", e => {
+    applyGridSetting(e.target.value);
+});
+
+async function loadData() {
+    const response = await fetch("data.json"); // [{name, image, link}, ...]
+    fullData = await response.json();
+    filteredData = [...fullData];
+    applyGridSetting("auto");
+    renderPage(1);
+}
+
+function sortData(type) {
+    filteredData.sort((a, b) =>
+        type === "az" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+    );
+}
+
+document.getElementById("sortSelect").addEventListener("change", e => {
+    sortData(e.target.value);
+    renderPage(1);
+});
+
+document.getElementById("searchInput").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    filteredData = fullData.filter(x => x.name.toLowerCase().includes(q));
+    renderPage(1);
+});
+
+function renderPage(num) {
+    currentPage = num;
+    const gallery = document.getElementById("gallery");
+    gallery.innerHTML = "";
+
+    const start = (num - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+
+    filteredData.slice(start, end).forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+            <a href="${item.link}" target="_blank">
+                <img loading="lazy" src="${item.image}">
+                <div class="card-title">${item.name}</div>
+            </a>
+        `;
+        gallery.appendChild(card);
+    });
+
+    renderPagination();
+}
+
+function renderPagination() {
+    const total = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const p = document.getElementById("pagination");
+
+    p.innerHTML = `
+        ${currentPage > 1 ? `<button onclick="renderPage(${currentPage - 1})">Prev</button>` : ""}
+        <span>Page ${currentPage} / ${total}</span>
+        ${currentPage < total ? `<button onclick="renderPage(${currentPage + 1})">Next</button>` : ""}
+    `;
+}
+
+document.getElementById("toggleMode").addEventListener("click", () => {
+    document.body.classList.toggle("light-mode");
+});
+
+const scrollBtn = document.getElementById("scrollTopBtn");
+window.addEventListener("scroll", () => {
+    scrollBtn.style.display = window.scrollY > 200 ? "block" : "none";
+});
+scrollBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
+// ========== LIST VIEW OVERLAY ==========
+const listOverlay = document.createElement("div");
+listOverlay.id = "listOverlay";
+listOverlay.style.position = "fixed";
+listOverlay.style.top = "0";
+listOverlay.style.left = "0";
+listOverlay.style.width = "100%";
+listOverlay.style.height = "100%";
+listOverlay.style.background = "rgba(0,0,0,0.95)";
+listOverlay.style.color = "var(--text)";
+listOverlay.style.zIndex = "9999";
+listOverlay.style.display = "none";
+listOverlay.style.overflowY = "auto";
+listOverlay.style.padding = "30px";
+listOverlay.style.boxSizing = "border-box";
+document.body.appendChild(listOverlay);
+
+// Close overlay if clicked outside
+listOverlay.addEventListener("click", e => {
+    if (e.target === listOverlay) listOverlay.style.display = "none";
+});
+
+// Button click to open overlay
+document.getElementById("listViewBtn").addEventListener("click", () => {
+    renderListOverlay();
+    listOverlay.style.display = "block";
+});
+
+function renderListOverlay() {
+    listOverlay.innerHTML = `
+        <input type="text" id="overlaySearch" placeholder=" Search by name…" style="width:100%;padding:12px;border-radius:8px;border:none;margin-bottom:20px;font-size:16px;">
+        <div id="overlayList"></div>
+    `;
+
+    const overlayList = document.getElementById("overlayList");
+
+    const sortedData = [...fullData].sort((a,b) => a.name.localeCompare(b.name));
+
+    sortedData.forEach(item => {
+        const div = document.createElement("div");
+        div.textContent = item.name;
+        div.style.padding = "10px 0";
+        div.style.cursor = "pointer";
+        div.style.borderBottom = "1px solid #444";
+        div.addEventListener("click", () => {
+            window.open(item.link, "_blank");
+        });
+        overlayList.appendChild(div);
+    });
+
+    document.getElementById("overlaySearch").addEventListener("input", e => {
+        const q = e.target.value.toLowerCase();
+        overlayList.innerHTML = "";
+        sortedData.filter(x => x.name.toLowerCase().includes(q))
+                  .forEach(item => {
+            const div = document.createElement("div");
+            div.textContent = item.name;
+            div.style.padding = "10px 0";
+            div.style.cursor = "pointer";
+            div.style.borderBottom = "1px solid #444";
+            div.addEventListener("click", () => window.open(item.link, "_blank"));
+            overlayList.appendChild(div);
+        });
+    });
+}
+
+loadData();
+</script>
+
+</body>
+</html>
