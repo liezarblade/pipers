@@ -1,51 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOᗰᗩTO</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+    <!-- Google tag -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8K3GP3XVPB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-8K3GP3XVPB');
+</script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TOᗰᗩTO</title>
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dose.css?v=24">
 </head>
 
 <body>
 
 <header>
-    <div class="logo">🍅 T O ᗰ ᗩ T O </div>
+  <div class="logo">🍅 T O ᗰ ᗩ T O </div>
 
-    <div class="controls">
-        <select id="sortSelect">
-            <option value="az">Sort A → Z</option>
-            <option value="za">Sort Z → A</option>
-        </select>
+  <div class="controls">
+      <select id="sortSelect">
+          <option value="az">Sort A → Z</option>
+          <option value="za">Sort Z → A</option>
+      </select>
 
-        <select id="gridSelect">
-            <option value="auto"> Layout</option>
-            <option value="1">1 per row</option>
-            <option value="2">2 per row</option>
-            <option value="3">3 per row</option>
-            <option value="4">4 per row</option>
-        </select>
+      <select id="gridSelect">
+          <option value="auto">Layout</option>
+          <option value="1">1 per row</option>
+          <option value="2">2 per row</option>
+          <option value="3">3 per row</option>
+          <option value="4">4 per row</option>
+      </select>
 
-        <button id="toggleMode" class="toggle-btn">🌙/☀️</button>
-        <button id="listViewBtn" class="toggle-btn"> MODELS </button>
-    </div>
+      <button id="toggleMode" class="toggle-btn">THEME</button>
+
+      <button id="listViewBtn" class="toggle-btn" style="display:none;">onlyFans</button>
+      <button id="doseBtn" class="toggle-btn">Ullu Originals</button>
+  </div>
 </header>
 
+
+    
 <div class="search-container">
-    <input type="text" id="searchInput" placeholder=" Search by name…">
+  <input type="text" id="searchInput" placeholder=" Search by name…">
 </div>
 
-<div id="gallery" class="gallery"></div>
 
+<div id="topPicksSection"></div>
+<div id="latestHitsSection"></div>
+
+<div id="gallery" class="gallery"></div>
 <div id="pagination"></div>
 
 <button class="scroll-to-top" id="scrollTopBtn">▲</button>
 
+<!-- DOSE GRID -->
+<div id="doseContainer" class="gallery" style="display:none; padding-top:10px;"></div>
+
+<!-- DOSE POPUP -->
+<div id="dosePopup" aria-hidden="true">
+  <div id="doseBox">
+    <div id="doseLeft">
+      <img id="popupImage" src="" alt="">
+    </div>
+
+    <div id="doseRight">
+      <div id="doseHeader">
+        <div>
+          <div id="doseName"></div>
+          <div id="doseSub" style="color:#aaa; font-size:13px;">Prefer V-Cloud</div>
+        </div>
+
+        <button id="doseCloseBtn">✕</button>
+      </div>
+
+      <div id="doseBody" style="margin-top:8px; overflow:auto; max-height:60vh;"></div>
+    </div>
+  </div>
+</div>
+
 <script>
+
 const ITEMS_PER_PAGE = 100;
 let fullData = [], filteredData = [], currentPage = 1;
 
-// Auto layout based on screen width
+let doseData = [];
+let doseFiltered = [];
+let inDoseMode = false;
+
+/* ======================================================
+   AUTO GRID
+====================================================== */
 function autoGrid() {
     if (window.innerWidth < 600) return "1";
     if (window.innerWidth < 900) return "2";
@@ -53,155 +103,290 @@ function autoGrid() {
 }
 
 function applyGridSetting(value) {
-    const gallery = document.getElementById("gallery");
-    if (value === "auto") {
-        gallery.style.gridTemplateColumns = `repeat(${autoGrid()}, 1fr)`;
-    } else {
-        gallery.style.gridTemplateColumns = `repeat(${value}, 1fr)`;
-    }
+    const g1 = document.getElementById("gallery");
+    const g2 = document.getElementById("doseContainer");
+
+    const cols = value === "auto" ? autoGrid() : value;
+
+    g1.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    g2.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 }
 
 document.getElementById("gridSelect").addEventListener("change", e => {
     applyGridSetting(e.target.value);
 });
 
+/* ======================================================
+   LOAD MAIN DASHBOARD
+====================================================== */
 async function loadData() {
-    const response = await fetch("data.json"); // [{name, image, link}, ...]
-    fullData = await response.json();
+    try {
+        const response = await fetch("data.json");
+        fullData = await response.json();
+    } catch (e) {
+        fullData = [];
+    }
+
     filteredData = [...fullData];
+
     applyGridSetting("auto");
+    renderCategories();
     renderPage(1);
+
+    document.getElementById("doseBtn").style.display = "inline-block";
+    document.getElementById("listViewBtn").style.display = "none";
 }
 
+/* ======================================================
+   CATEGORIES
+====================================================== */
+function renderCategories() {
+    const top = fullData.filter(x => x.category === "Top Picks");
+    const latest = fullData.filter(x => x.category === "Latest Hits");
+
+    const t = document.getElementById("topPicksSection");
+    const l = document.getElementById("latestHitsSection");
+
+    t.innerHTML = ""; l.innerHTML = "";
+
+    if (top.length) {
+        t.innerHTML = `<h2 style="margin-top:20px;">🔥 Top Picks</h2>`;
+        t.appendChild(makeCategoryGrid(top));
+    }
+
+    if (latest.length) {
+        l.innerHTML = `<h2 style="margin-top:20px;">✨ Latest Hits</h2>`;
+        l.appendChild(makeCategoryGrid(latest));
+    }
+}
+
+function makeCategoryGrid(list) {
+    const sec = document.createElement("div");
+    sec.style.display = "grid";
+    sec.style.gridTemplateColumns = `repeat(${autoGrid()}, 1fr)`;
+    sec.style.gap = "15px";
+
+    list.forEach(item => {
+        const c = document.createElement("div");
+        c.className = "card";
+        c.innerHTML = `
+        <a href="${item.link}" target="_blank">
+            <img loading="lazy" src="${item.image}">
+            <div class="card-title">${item.name}</div>
+        </a>`;
+        sec.appendChild(c);
+    });
+
+    return sec;
+}
+
+/* ======================================================
+   SORT (MAIN + DOSE)
+====================================================== */
 function sortData(type) {
-    filteredData.sort((a, b) =>
-        type === "az" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-    );
+    if (!inDoseMode) {
+        filteredData.sort((a, b) => {
+            return type === "az"
+                ? a.name.localeCompare(b.name)
+                : b.name.localeCompare(a.name);
+        });
+        renderPage(1);
+    } else {
+        doseFiltered.sort((a, b) => {
+            return type === "az"
+                ? a.name.localeCompare(b.name)
+                : b.name.localeCompare(a.name);
+        });
+        renderDoseGrid();
+    }
 }
 
 document.getElementById("sortSelect").addEventListener("change", e => {
     sortData(e.target.value);
-    renderPage(1);
 });
 
+/* ======================================================
+   SEARCH (ALREADY UNIVERSAL — DO NOT CHANGE)
+====================================================== */
 document.getElementById("searchInput").addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
-    filteredData = fullData.filter(x => x.name.toLowerCase().includes(q));
-    renderPage(1);
+
+    if (!inDoseMode) {
+        filteredData = fullData.filter(x => x.name.toLowerCase().includes(q));
+        renderPage(1);
+    } else {
+        doseFiltered = doseData.filter(x => x.name.toLowerCase().includes(q));
+        renderDoseGrid();
+    }
 });
 
+/* ======================================================
+   MAIN PAGE RENDER
+====================================================== */
 function renderPage(num) {
     currentPage = num;
-    const gallery = document.getElementById("gallery");
-    gallery.innerHTML = "";
+
+    const gal = document.getElementById("gallery");
+    gal.innerHTML = "";
 
     const start = (num - 1) * ITEMS_PER_PAGE;
     const end = start + ITEMS_PER_PAGE;
 
     filteredData.slice(start, end).forEach(item => {
+        if (item.category === "Top Picks" || item.category === "Latest Hits") return;
+
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML = `
             <a href="${item.link}" target="_blank">
                 <img loading="lazy" src="${item.image}">
                 <div class="card-title">${item.name}</div>
-            </a>
-        `;
-        gallery.appendChild(card);
+            </a>`;
+        gal.appendChild(card);
     });
 
     renderPagination();
 }
-
 function renderPagination() {
-    const total = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-    const p = document.getElementById("pagination");
+    const total = Math.max(1, Math.ceil(filteredData.length / ITEMS_PER_PAGE));
 
-    p.innerHTML = `
-        ${currentPage > 1 ? `<button onclick="renderPage(${currentPage - 1})">Prev</button>` : ""}
-        <span>Page ${currentPage} / ${total}</span>
-        ${currentPage < total ? `<button onclick="renderPage(${currentPage + 1})">Next</button>` : ""}
-    `;
+    let html = "";
+
+    if (currentPage > 1) {
+        html += `<button onclick="renderPage(${currentPage - 1})">Prev</button>`;
+    }
+
+    const start = Math.max(1, currentPage - 3);
+    const end = Math.min(total, currentPage + 3);
+
+    for (let i = start; i <= end; i++) {
+        if (i === currentPage) {
+            html += `<button disabled class="active-page">${i}</button>`;
+        } else {
+            html += `<button onclick="renderPage(${i})">${i}</button>`;
+        }
+    }
+
+    if (currentPage < total) {
+        html += `<button onclick="renderPage(${currentPage + 1})">Next</button>`;
+    }
+
+    // render BOTH paginations
+    document.getElementById("pagination").innerHTML = html;
+    document.getElementById("paginationTop").innerHTML = html;
 }
 
+/* ======================================================
+   DOSE DASHBOARD
+====================================================== */
+document.getElementById("doseBtn").addEventListener("click", openDoseDashboard);
+document.getElementById("listViewBtn").addEventListener("click", closeDoseDashboard);
+
+async function openDoseDashboard() {
+
+    inDoseMode = true;
+
+    try {
+        const res = await fetch("dose.json");
+        doseData = await res.json();
+    } catch {
+        doseData = [];
+    }
+
+    doseFiltered = [...doseData];
+
+    document.getElementById("topPicksSection").style.display = "none";
+    document.getElementById("latestHitsSection").style.display = "none";
+    document.getElementById("gallery").style.display = "none";
+    document.getElementById("pagination").style.display = "none";
+
+    document.getElementById("doseContainer").style.display = "grid";
+
+    document.getElementById("doseBtn").style.display = "none";
+    document.getElementById("listViewBtn").style.display = "inline-block";
+
+    renderDoseGrid();
+}
+
+/* DOSE GRID RENDER */
+function renderDoseGrid() {
+    const box = document.getElementById("doseContainer");
+    box.innerHTML = "";
+
+    doseFiltered.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+            <img src="${item.image}">
+            <div class="card-title">${item.name}</div>
+        `;
+        card.onclick = () => openDosePopup(item);
+        box.appendChild(card);
+    });
+}
+
+/* EXIT DOSE MODE */
+function closeDoseDashboard() {
+    inDoseMode = false;
+
+    document.getElementById("doseContainer").style.display = "none";
+
+    document.getElementById("topPicksSection").style.display = "block";
+    document.getElementById("latestHitsSection").style.display = "block";
+    document.getElementById("gallery").style.display = "grid";
+    document.getElementById("pagination").style.display = "block";
+
+    document.getElementById("doseBtn").style.display = "inline-block";
+    document.getElementById("listViewBtn").style.display = "none";
+
+    renderPage(1);
+}
+
+/* ======================================================
+   DOSE POPUP
+====================================================== */
+function openDosePopup(item) {
+    document.getElementById("popupImage").src = item.image;
+    document.getElementById("doseName").textContent = item.name;
+
+    const body = document.getElementById("doseBody");
+    body.innerHTML = "";
+
+    item.qualities.forEach(q => {
+        body.innerHTML += `
+            <div class="qualityBlock">
+                <div class="qualityTitle">${q.quality}</div>
+                <div class="clientButtons">
+                    ${q.clients.map(c => `<a href="${c.link}" target="_blank">${c.name}</a>`).join("")}
+                </div>
+            </div>`;
+    });
+
+    document.getElementById("dosePopup").style.display = "flex";
+}
+
+document.getElementById("doseCloseBtn").addEventListener("click", () => {
+    document.getElementById("dosePopup").style.display = "none";
+});
+
+
+/* ======================================================
+   GLOBAL THEME SWITCH (LIGHT/DARK)
+====================================================== */
 document.getElementById("toggleMode").addEventListener("click", () => {
-    document.body.classList.toggle("light-mode");
+    document.body.classList.toggle("dark");
+
+    const pop = document.getElementById("dosePopup");
+    pop.classList.toggle("dark");
+
+    const box = document.getElementById("doseBox");
+    box.classList.toggle("dark");
 });
 
-const scrollBtn = document.getElementById("scrollTopBtn");
-window.addEventListener("scroll", () => {
-    scrollBtn.style.display = window.scrollY > 200 ? "block" : "none";
-});
-scrollBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
-// ========== LIST VIEW OVERLAY ==========
-const listOverlay = document.createElement("div");
-listOverlay.id = "listOverlay";
-listOverlay.style.position = "fixed";
-listOverlay.style.top = "0";
-listOverlay.style.left = "0";
-listOverlay.style.width = "100%";
-listOverlay.style.height = "100%";
-listOverlay.style.background = "rgba(0,0,0,0.95)";
-listOverlay.style.color = "var(--text)";
-listOverlay.style.zIndex = "9999";
-listOverlay.style.display = "none";
-listOverlay.style.overflowY = "auto";
-listOverlay.style.padding = "30px";
-listOverlay.style.boxSizing = "border-box";
-document.body.appendChild(listOverlay);
-
-// Close overlay if clicked outside
-listOverlay.addEventListener("click", e => {
-    if (e.target === listOverlay) listOverlay.style.display = "none";
-});
-
-// Button click to open overlay
-document.getElementById("listViewBtn").addEventListener("click", () => {
-    renderListOverlay();
-    listOverlay.style.display = "block";
-});
-
-function renderListOverlay() {
-    listOverlay.innerHTML = `
-        <input type="text" id="overlaySearch" placeholder=" Search by name…" style="width:100%;padding:12px;border-radius:8px;border:none;margin-bottom:20px;font-size:16px;">
-        <div id="overlayList"></div>
-    `;
-
-    const overlayList = document.getElementById("overlayList");
-
-    const sortedData = [...fullData].sort((a,b) => a.name.localeCompare(b.name));
-
-    sortedData.forEach(item => {
-        const div = document.createElement("div");
-        div.textContent = item.name;
-        div.style.padding = "10px 0";
-        div.style.cursor = "pointer";
-        div.style.borderBottom = "1px solid #444";
-        div.addEventListener("click", () => {
-            window.open(item.link, "_blank");
-        });
-        overlayList.appendChild(div);
-    });
-
-    document.getElementById("overlaySearch").addEventListener("input", e => {
-        const q = e.target.value.toLowerCase();
-        overlayList.innerHTML = "";
-        sortedData.filter(x => x.name.toLowerCase().includes(q))
-                  .forEach(item => {
-            const div = document.createElement("div");
-            div.textContent = item.name;
-            div.style.padding = "10px 0";
-            div.style.cursor = "pointer";
-            div.style.borderBottom = "1px solid #444";
-            div.addEventListener("click", () => window.open(item.link, "_blank"));
-            overlayList.appendChild(div);
-        });
-    });
-}
-
+/* INITIAL LOAD */
 loadData();
-</script>
 
+</script>
 </body>
 </html>
